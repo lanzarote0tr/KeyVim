@@ -1,0 +1,4 @@
+gcc -c helper.c
+gcc -DHEADER_TEST helper.c
+gcc -c main.c
+gcc main.o helper.o -o myprogram

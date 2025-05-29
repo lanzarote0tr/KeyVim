@@ -1,12 +1,13 @@
-typedef struct _coor {
-    int x;
-    int y;
-} coor;
+#include "outputhandler.h"
 
-coor Window;
-char *Window_buffer;
+#include <termios.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
-coor Getwindowsize(void) {
+coor GetWindowSize(void) {
 #ifdef _WIN32
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     coor size;
@@ -24,7 +25,7 @@ coor Getwindowsize(void) {
 #endif
 }
 
-coor Getcursorpos(void) {
+coor GetCursorPos(void) {
 #ifdef _WIN32
     coor pos = {0, 0};
     CONSOLE_SCREEN_BUFFER_INFO csbi;
@@ -38,11 +39,8 @@ coor Getcursorpos(void) {
     return pos;
 #else
     coor pos = {0, 0};
-
-    // 요청: ESC [6n
     write(STDOUT_FILENO, "\033[6n", 4);
     fflush(stdout);
-
     char buf[32];
     int i = 0;
     while (i < sizeof(buf) - 1) {
@@ -51,56 +49,70 @@ coor Getcursorpos(void) {
         i++;
     }
     buf[i] = '\0';
-
-    // 응답 형식: ESC [ row ; col R
     if (buf[0] == '\033' && buf[1] == '[') {
-        sscanf(&buf[2], "%d;%d", &pos.y, &pos.x);
+        sscanf(&buf[2], "%d%d", &pos.y, &pos.x);
     }
-
     return pos;
 #endif
 }
 
-
-void Putchar(char a) {
-    putc(a, stdout);
+void SetCursorPos(coor cursor) {
+#ifdef _WIN32
+    COORD pos = {cursor.x, cursor.y};
+    SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), pos);
+#else
+    printf("\033[%d;%dH", cursor.y, cursor.x);
+    fflush(stdout);
+#endif
     return;
 }
 
-void Putchar_coor(char a, coor c) {
-    Window_buffer[(Window.x+1) * c.y + c.x] = a;
+/********
+9 * 3
+x * y
+012345678
+901234567
+890123456
+********/
+
+char **InitWindowBuffer(coor w) {
+    char **Window_buffer = (char**)malloc((w.y + 1) * sizeof(char*));
+    for(int i=0;i<=w.y;++i) {
+        Window_buffer[i] = (char*)malloc((w.x + 1) * sizeof(char));
+    }
+    return Window_buffer;
+}
+
+void KillWindowBuffer(char **Window_buffer, coor w) {
+    for(int i=0;i<=w.y;++i) {
+        free(Window_buffer[i]);
+    }
+    free(Window_buffer);
     return;
 }
 
-void Putwindow(void) {
-    coor p = get_cursor_pos();
+void RenderWindow(char *Window_buffer) {
+    coor p = GetCursorPos();
     fwrite(Window_buffer, 1, strlen(Window_buffer), stdout);
-    move_cursor_to(p);
+    //MoveCursorTo(p);
     return;
 }
 
-void hide_cursor() {
-#ifdef _WIN32
-    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    CONSOLE_CURSOR_INFO cursorInfo;
-    GetConsoleCursorInfo(hOut, &cursorInfo);
-    cursorInfo.bVisible = FALSE;
-    SetConsoleCursorInfo(hOut, &cursorInfo);
-#else
-    printf("\033[?25l");
-#endif
+#ifdef HEADER_TEST
+
+int main(void) {
+    system("clear");
+    for(int i=0;i<30;i++) {
+        for(int j=0;j<30;j++) {
+            printf("a");
+        }printf("\n");
+    }
+    coor k = {3, 4};
+    SetCursorPos(k);
+    system("sleep 100");
+    return 0;
 }
 
-void show_cursor() {
-#ifdef _WIN32
-    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    CONSOLE_CURSOR_INFO cursorInfo;
-    GetConsoleCursorInfo(hOut, &cursorInfo);
-    cursorInfo.bVisible = TRUE;
-    SetConsoleCursorInfo(hOut, &cursorInfo);
-#else
-    printf("\033[?25h");
-#endif
-}
+#endif // HEADER_TEST
 
 

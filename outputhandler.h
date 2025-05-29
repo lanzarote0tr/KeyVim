@@ -1,14 +1,13 @@
-typedef struct _coor coor;
+typedef struct _coor {
+    unsigned int x;
+    unsigned int y;
+} coor;
+coor GetWindowSize(void);
+coor GetCursorPos(void);
+void SetCursorPos(coor cursor);
 
-coor Window;
-char *Window_buffer;
+char **InitWindowBuffer(coor w);
+void KillWindowBuffer(char **Window_buffer, coor w);
 
-coor Getwindowsize(void);
-coor Getcursorpos(void);
-void Putchar(char a);
-void Putchar_coor(char a, coor c);
-void Putwindow(void);
-
-void hide_cursor();
-void show_cursor();
+void RenderWindow(char *Window_buffer);
 

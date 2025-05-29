@@ -34,35 +34,24 @@
 void xsetup(void);
 
 struct termios *original;
+coor Window;
+char **WindowBuffer
 
 void program_end(void) {
 #ifndef _WIN32
     reset_input_mode(original);
 #endif
-    free(Window_buffer);
-    return;
-}
-
-void Defaultscreen(void) {
-    Clear();
-    for(int i = 0;i < Window.y;++i) {
-        Window_buffer[(Window.x+1) * i] = '~';
-    }
+    KillWindowBuffer(Window_buffer);
     return;
 }
 
 void game(void) {
     //Clear();
-    Defaultscreen();
-    coor k;
-    k.x = 1;
-    k.y = 1;
-    Putchar_coor('k', k);
-    Putwindow();
+    coor cursor = {0, 0};
     while(1) {
         char k = Getchar();
         if(k == 'q') exit(0);
-        Putchar(k);
+        
     }
     return;
 }
@@ -78,14 +67,13 @@ int main(void) {
     setvbuf(stdout, NULL, _IONBF, 0);
     xsetup();
     Window = Getwindowsize();
-    Window_buffer = (char*)malloc(sizeof(char) * (Window.x + 1) * Window.y + 1);
-    // printf("%d %d", Window.x, Window.y);
-    for (int i = 0; i < (Window.x + 1) * Window.y; ++i) {
-        Window_buffer[i] = ' ';
+    WindowBuffer = InitWindowBuffer();
+    for (int i = 0; i < Window.y; ++i) {
+        for (int j = 0; j < Window.x; ++j) {
+            WindowBuffer[i][j] = ' ';
+        }
     }
     for(int i=0;i<Window.y - 1;++i)
-        Window_buffer[i * (Window.x + 1) + Window.x] = '\n';
-    Window_buffer[(Window.y - 1) * (Window.x + 1) + Window.x] = '\0'; // null-terminator
 
     options();
     return 0;
@@ -159,7 +147,7 @@ void xsetup(void) {
 int options(void) {
     printf("Welcome to KeyVim!\n[S] Start Game\n[O] Options\n[T] Tutorial\n[Q] Exit\nSelect an option: ");
     char input = Getchar();
-    Putchar('\n');
+    putc('\n', stdout);
     switch(input) {
     case 'S':
     case 's':
