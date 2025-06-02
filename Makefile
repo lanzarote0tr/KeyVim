@@ -1,32 +1,20 @@
-CC = gcc
-CFLAGS = -Wall -Wextra -O2
+all: main.c helper.c inputhandler.c outputhandler.c helper.h inputhandler.h outputhandler.h
+	gcc -c -o main.o main.c
+	gcc -c -o helper.o helper.c
+	gcc -c -o inputhandler.o inputhandler.c
+	gcc -c -o outputhandler.o outputhandler.c
+	gcc helper.o inputhandler.o outputhandler.o main.o
 
-SRC = main.c helper.c inputhandler.c outputhandler.c
-OBJ = $(SRC:.c=.o)
+helper: helper.c
+	gcc -DHEADER_TEST helper.c
 
-TARGET = a.out
-TEST_TARGET = test_helper
+inputhandler: inputhandler.c
+	gcc -DHEADER_TEST inputhandler.c
 
-all: $(TARGET)
-
-$(TARGET): $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $^
-
-# 테스트용 빌드 (조건부 main 사용)
-testhelper: helper.c
-	$(CC) $(CFLAGS) -DHEADER_TEST helper.c -o $(TEST_TARGET)
-
-testinputhandler: inputhandler.c
-	$(CC) $(CFLAGS) -DHEADER_TEST inputhandler.c -o $(TEST_TARGET)
-
-testoutputhandler: outputhandler.c
-	$(CC) $(CFLAGS) -DHEADER_TEST outputhandler.c -o $(TEST_TARGET)
-
-# 개별 오브젝트 파일 만들기
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+outputhandler: outputhandler.c
+	gcc -DHEADER_TEST outputhandler.c
 
 # 클린업
 clean:
-	rm -f *.o $(TARGET) $(TEST_TARGET)
+	rm -f *.o
 

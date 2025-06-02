@@ -6,6 +6,16 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include "helper.h"
+
+void ClearWindowBuffer(char **WindowBuffer, coor Window) {
+    for (int i = 0; i <= Window.y; ++i) {
+        for (int j = 0; j < Window.x; ++j) {
+            WindowBuffer[i][j] = ' ';
+        }
+        WindowBuffer[i][Window.x] = '\0';
+    }
+}
 
 coor GetWindowSize(void) {
 #ifdef _WIN32
@@ -67,6 +77,37 @@ void SetCursorPos(coor cursor) {
     return;
 }
 
+void HideCursor(void) {
+#ifdef _WIN32
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    CONSOLE_CURSOR_INFO cursorInfo;
+
+    GetConsoleCursorInfo(hConsole, &cursorInfo);
+    cursorInfo.bVisible = FALSE;
+    SetConsoleCursorInfo(hConsole, &cursorInfo);
+#else
+    printf("\033[?25l");
+    fflush(stdout);
+#endif
+    return;
+}
+
+void ShowCursor(void) {
+#ifdef _WIN32
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    CONSOLE_CURSOR_INFO cursorInfo;
+
+    GetConsoleCursorInfo(hConsole, &cursorInfo);
+    cursorInfo.bVisible = TRUE;
+    SetConsoleCursorInfo(hConsole, &cursorInfo);
+#else
+    printf("\033[?25h");
+    fflush(stdout);
+#endif
+    return;
+}
+
+
 /********
 9 * 3
 x * y
@@ -76,9 +117,9 @@ x * y
 ********/
 
 char **InitWindowBuffer(coor w) {
-    char **Window_buffer = (char**)malloc((w.y + 1) * sizeof(char*));
+    char **Window_buffer = (char**)malloc((w.y + 3) * sizeof(char*));
     for(int i=0;i<=w.y;++i) {
-        Window_buffer[i] = (char*)malloc((w.x + 1) * sizeof(char));
+        Window_buffer[i] = (char*)malloc((w.x + 3) * sizeof(char));
     }
     return Window_buffer;
 }
@@ -91,16 +132,55 @@ void KillWindowBuffer(char **Window_buffer, coor w) {
     return;
 }
 
-void RenderWindow(char *Window_buffer) {
+void RenderFullWindow(char **WindowBuffer, coor Window, coor Cursor) {
     coor p = GetCursorPos();
-    fwrite(Window_buffer, 1, strlen(Window_buffer), stdout);
-    //MoveCursorTo(p);
+    HideCursor();
+    for(int i=0;i<=Window.y;++i) {
+        SetCursorPos((coor){0, i});
+        for(int j=0;j < Window.x;++j) {
+            printf("%c", WindowBuffer[i][j]);
+        }
+    }
+    fflush(stdout);
+    if (Cursor.x == -1 && Cursor.y == -1) {
+        SetCursorPos(p);
+    } else {
+        SetCursorPos(Cursor);
+    }
+    ShowCursor();
+    return;
+}
+
+void RenderString(char *str, char **WindowBuffer, coor Window, coor Cursor) {
+    //printf(str);
+    Clear();
+    Cursor.x = 0;
+    Cursor.y = 0;
+    int len = strlen(str);
+    for(int i=0;i<len;++i) {
+        if (str[i] == '\n') {
+            // CRLF
+            Cursor.x = 0;
+            ++Cursor.y;
+        } else {
+            WindowBuffer[Cursor.y][Cursor.x] = str[i]; // Put character
+            ++Cursor.x; // Move cursor forward
+            // Check if it's the end of line
+            if (Window.x <= Cursor.x) {
+                // CRLF
+                Cursor.x = 0;
+                ++Cursor.y;
+            }
+        }
+    }
+    RenderFullWindow(WindowBuffer, Window, Cursor);
     return;
 }
 
 #ifdef HEADER_TEST
 
 int main(void) {
+    /*
     system("clear");
     for(int i=0;i<30;i++) {
         for(int j=0;j<30;j++) {
@@ -110,6 +190,9 @@ int main(void) {
     coor k = {3, 4};
     SetCursorPos(k);
     system("sleep 100");
+    */
+    coor k = GetWindowSize();
+    printf("%d and %d\n", k.x, k.y);
     return 0;
 }
 
