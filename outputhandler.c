@@ -1,23 +1,25 @@
 #include "outputhandler.h"
 
+#ifndef _WIN32
 #include <termios.h>
+#include <sys/ioctl.h>
+#endif
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/ioctl.h>
 #include <unistd.h>
 #include "helper.h"
 
-void ClearWindowBuffer(char **WindowBuffer, coor Window) {
+void ClearWindowBuffer(char **WindowBuffer, coor Window) { // VERIFIED
     for (int i = 0; i <= Window.y; ++i) {
         for (int j = 0; j < Window.x; ++j) {
-            WindowBuffer[i][j] = ' ';
+            WindowBuffer[i][j] = '\0';
         }
         WindowBuffer[i][Window.x] = '\0';
     }
 }
 
-coor GetWindowSize(void) {
+coor GetWindowSize(void) { // VERIFIED
 #ifdef _WIN32
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     coor size;
@@ -35,7 +37,7 @@ coor GetWindowSize(void) {
 #endif
 }
 
-coor GetCursorPos(void) {
+coor GCursorPos(void) {
 #ifdef _WIN32
     coor pos = {0, 0};
     CONSOLE_SCREEN_BUFFER_INFO csbi;
@@ -66,18 +68,18 @@ coor GetCursorPos(void) {
 #endif
 }
 
-void SetCursorPos(coor cursor) {
+void CursorPos(coor cursor) {
 #ifdef _WIN32
     COORD pos = {cursor.x, cursor.y};
     SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), pos);
 #else
-    printf("\033[%d;%dH", cursor.y, cursor.x);
+    printf("\033[%d;%dH", cursor.y + 1, cursor.x + 1);
     fflush(stdout);
 #endif
     return;
 }
 
-void HideCursor(void) {
+void HCursor(void) {
 #ifdef _WIN32
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
     CONSOLE_CURSOR_INFO cursorInfo;
@@ -92,7 +94,7 @@ void HideCursor(void) {
     return;
 }
 
-void ShowCursor(void) {
+void SCursor(void) {
 #ifdef _WIN32
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
     CONSOLE_CURSOR_INFO cursorInfo;
@@ -116,15 +118,15 @@ x * y
 890123456
 ********/
 
-char **InitWindowBuffer(coor w) {
-    char **Window_buffer = (char**)malloc((w.y + 3) * sizeof(char*));
-    for(int i=0;i<=w.y;++i) {
-        Window_buffer[i] = (char*)malloc((w.x + 3) * sizeof(char));
+char **InitWindowBuffer(coor Window) { // VERIFIED
+    char **Window_buffer = (char**)malloc((Window.y + 3) * sizeof(char*));
+    for(int i=0;i<=Window.y;++i) {
+        Window_buffer[i] = (char*)malloc((Window.x + 3) * sizeof(char));
     }
     return Window_buffer;
 }
 
-void KillWindowBuffer(char **Window_buffer, coor w) {
+void KillWindowBuffer(char **Window_buffer, coor w) { // VERIFIED
     for(int i=0;i<=w.y;++i) {
         free(Window_buffer[i]);
     }
@@ -133,43 +135,45 @@ void KillWindowBuffer(char **Window_buffer, coor w) {
 }
 
 void RenderFullWindow(char **WindowBuffer, coor Window, coor Cursor) {
-    coor p = GetCursorPos();
-    HideCursor();
-    for(int i=0;i<=Window.y;++i) {
-        SetCursorPos((coor){0, i});
-        for(int j=0;j < Window.x;++j) {
-            printf("%c", WindowBuffer[i][j]);
-        }
+    if (Cursor.x == -1)
+        Cursor = GCursorPos();
+    ClearScreen();
+    HCursor();
+    CursorPos((coor){0, 0});
+    for (int row = 0; row < Window.y; ++row) {
+        /* Faster than printf for fixed-width writes and guarantees we
+           overwrite any leftovers from the previous frame. */
+        fwrite(WindowBuffer[row], 1, Window.x, stdout);
+
+        /* Put a newline after every row except the last; this keeps the
+           cursor parked at the bottom-right instead of dropping to the
+           next line and causing scroll. */
+        if (row != Window.y-1) fputc('\n', stdout); 
     }
+
     fflush(stdout);
-    if (Cursor.x == -1 && Cursor.y == -1) {
-        SetCursorPos(p);
-    } else {
-        SetCursorPos(Cursor);
-    }
-    ShowCursor();
+    CursorPos(Cursor);
+    SCursor();
     return;
 }
 
 void RenderString(char *str, char **WindowBuffer, coor Window, coor Cursor) {
-    //printf(str);
-    Clear();
-    Cursor.x = 0;
-    Cursor.y = 0;
+    ClearWindowBuffer(WindowBuffer, Window);
+    int x = 0, y = 0;
     int len = strlen(str);
     for(int i=0;i<len;++i) {
         if (str[i] == '\n') {
             // CRLF
-            Cursor.x = 0;
-            ++Cursor.y;
+            x = 0;
+            ++y;
         } else {
-            WindowBuffer[Cursor.y][Cursor.x] = str[i]; // Put character
-            ++Cursor.x; // Move cursor forward
+            WindowBuffer[y][x] = str[i]; // Put character
+            ++x; // Move cursor forward
             // Check if it's the end of line
-            if (Window.x <= Cursor.x) {
+            if (Window.x <= x) {
                 // CRLF
-                Cursor.x = 0;
-                ++Cursor.y;
+                x = 0;
+                ++y;
             }
         }
     }
@@ -177,22 +181,46 @@ void RenderString(char *str, char **WindowBuffer, coor Window, coor Cursor) {
     return;
 }
 
+void RenderRange(char *str, char **WindowBuffer, coor Window, coor TL, coor BR) {
+    for (int i = TL.y; i <= BR.y; ++i)
+        for (int j = TL.x; j <= BR.x; ++j)
+            WindowBuffer[i][j] = ' ';
+    int x = TL.x, y = TL.y;
+    int len = strlen(str);
+    for(int i=0;i<len;++i) {
+        if (str[i] == '\n') {
+            // CRLF
+            x = TL.x;
+            ++y;
+        } else {
+            WindowBuffer[y][x] = str[i]; // Put character
+            ++x; // Move cursor forward
+            // Check if it's the end of line
+            if (BR.x <= x) {
+                // CRLF
+                x = TL.x;
+                ++y;
+            }
+        }
+    }
+    RenderFullWindow(WindowBuffer, Window, (coor){-1, -1});
+    return;
+}
+
+void RenderLine(char *str, coor Window, coor Cursor) {
+    HCursor();
+    CursorPos((coor){0, Cursor.y});
+    fwrite(str, sizeof(char), Window.x, stdout);
+    fflush(stdout);
+    CursorPos(Cursor);
+    SCursor();
+    return;
+}
+
 #ifdef HEADER_TEST
 
 int main(void) {
-    /*
-    system("clear");
-    for(int i=0;i<30;i++) {
-        for(int j=0;j<30;j++) {
-            printf("a");
-        }printf("\n");
-    }
-    coor k = {3, 4};
-    SetCursorPos(k);
-    system("sleep 100");
-    */
     coor k = GetWindowSize();
-    printf("%d and %d\n", k.x, k.y);
     return 0;
 }
 

@@ -1,68 +1,34 @@
-# merge_clean_with_test_comments.py
+#!/usr/bin/env python3
 import re
+from pathlib import Path
 
-files = ["main.c", "helper.c", "inputhandler.c"]
-included_headers = set()
-output = []
+# match   #include "foo.h"
+STD_INC   = re.compile(r'^\s*#include\s+"([^"]+)\.h"\s*$')
+# match   :#include "foo.h":   (delete-only)
+COLON_INC = re.compile(r'^\s*:\s*#include\s+"[^"]+\.h"\s*:\s*$')
 
-def inline_includes(lines):
-    result = []
-    for line in lines:
-        match = re.match(r'#include\s+"(.+)"', line)
-        if match:
-            hdr = match.group(1)
-            if hdr not in included_headers:
-                included_headers.add(hdr)
-                with open(hdr) as f:
-                    result += inline_includes(f.readlines())
-        else:
-            result.append(line)
-    return result
+src      = Path("main.c")
+out_file = Path("merged.c")
 
-def remove_test_main(lines):
-    new_lines = []
-    in_main = False
-    brace_depth = 0
-    for line in lines:
-        if not in_main:
-            if re.match(r'\s*int\s+main\s*\(', line):
-                in_main = True
-                brace_depth = 0
-                continue
-            new_lines.append(line)
-        else:
-            brace_depth += line.count('{') - line.count('}')
-            if brace_depth <= 0:
-                in_main = False
-    return new_lines
-
-def comment_test_blocks(lines):
-    commented = []
-    in_test_block = False
-    for line in lines:
-        if '/* TEST_START */' in line:
-            in_test_block = True
-            commented.append('/* TEST_START */\n')
-            continue
-        elif '/* TEST_END */' in line:
-            in_test_block = False
-            commented.append('/* TEST_END */\n')
+with src.open() as fin, out_file.open("w") as fout:
+    for line in fin:
+        if COLON_INC.match(line):          # drop :#include ...:
             continue
 
-        if in_test_block:
-            commented.append('/* ' + line.rstrip('\n') + ' */\n')
-        else:
-            commented.append(line)
-    return commented
+        m = STD_INC.match(line)
+        if not m:                          # ordinary line
+            fout.write(line)
+            continue
 
-for fname in files:
-    with open(fname) as f:
-        lines = f.readlines()
-        lines = inline_includes(lines)
-        lines = remove_test_main(lines)
-        lines = comment_test_blocks(lines)
-        output += lines
+        name      = m.group(1)             # "foo"
+        c_path    = src.with_name(name + ".c")
+        self_inc  = re.compile(rf'^\s*#include\s+"{re.escape(name)}\.h"\s*$')
 
-with open("merged.c", "w") as f:
-    f.writelines(output)
+        fout.write(f"/* begin {c_path.name} */\n")
+        with c_path.open() as cf:
+            for cl in cf:
+                if self_inc.match(cl) or COLON_INC.match(cl):
+                    continue               # skip self-include & colon-includes
+                fout.write(cl)
+        fout.write(f"\n/* end {c_path.name} */\n")
 

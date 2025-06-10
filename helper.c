@@ -9,6 +9,15 @@
 #include <time.h>
 #endif
 
+void ClearScreen(void) { // VERIFIED
+#ifdef _WIN32
+    system("cls");
+#else
+    printf("\033[2J\033[H");
+    fflush(stdout);
+#endif
+}
+
 #ifdef _WIN32
 void Threading(void *f1, void *f2) {
     // Create Threads
@@ -54,15 +63,6 @@ void Wait(int ms) {
 #endif
 }
 
-void Clear(void) {
-#ifdef _WIN32
-    system("cls");
-#else
-    printf("\033[2J\033[H");
-    fflush(stdout);
-#endif
-}
-
 /* TEST_START */
 #ifdef HEADER_TEST
 
@@ -79,7 +79,6 @@ void _f2() {
 }
 
 int main(void) {
-    Clear();
     Threading((void*)_f1, (void*)_f2);
     return 0;
 }
