@@ -1,5 +1,17 @@
+/* * * * * * * * * *
+ *
+ *  outputhandler.c
+ *  KeyVim
+ *
+ *  Created by Lanzarote(Ethan Won Cho) on 5/9/2025
+ *  
+ *  
+ *  README!
+ *  Do not compile this code as C++. If so, critical potential errors can occur. 
+ *  Un-comment the type definition of coor when merging with main.c
+ *
+ * * * * * * * * * */
 #include "outputhandler.h"
-
 #ifndef _WIN32
 #include <termios.h>
 #include <sys/ioctl.h>
@@ -9,6 +21,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "helper.h"
+
+/* TODO: UN-COMMENT THIS AT MERGE
+typedef struct _coor { // Coordinates
+    unsigned int x;
+    unsigned int y;
+} coor;
+*/
 
 void ClearWindowBuffer(char **WindowBuffer, coor Window) { // VERIFIED
     for (int i = 0; i <= Window.y; ++i) {
@@ -135,8 +154,6 @@ void KillWindowBuffer(char **Window_buffer, coor w) { // VERIFIED
 }
 
 void RenderFullWindow(char **WindowBuffer, coor Window, coor Cursor) {
-    if (Cursor.x == -1)
-        Cursor = GCursorPos();
     ClearScreen();
     HCursor();
     CursorPos((coor){0, 0});
@@ -157,23 +174,35 @@ void RenderFullWindow(char **WindowBuffer, coor Window, coor Cursor) {
     return;
 }
 
-void RenderString(char *str, char **WindowBuffer, coor Window, coor Cursor) {
-    ClearWindowBuffer(WindowBuffer, Window);
-    int x = 0, y = 0;
-    int len = strlen(str);
-    for(int i=0;i<len;++i) {
-        if (str[i] == '\n') {
-            // CRLF
-            x = 0;
-            ++y;
-        } else {
-            WindowBuffer[y][x] = str[i]; // Put character
-            ++x; // Move cursor forward
-            // Check if it's the end of line
-            if (Window.x <= x) {
+void RenderRange(char *str, char **WindowBuffer, coor Window, coor TL, coor BR, coor Cursor) {
+    for (int i = TL.y; i <= BR.y; ++i)
+        for (int j = TL.x; j <= BR.x; ++j)
+            WindowBuffer[i][j] = ' ';
+    int x = TL.x, y = TL.y;
+    if (str != NULL) {
+        int len = strlen(str);
+        for(int i=0;i<len;++i) {
+            if (str[i] == '\n') {
                 // CRLF
-                x = 0;
+                x = TL.x;
                 ++y;
+                if (BR.y <= y) {
+                    perror("RenderRange: Out of Bound");
+                    exit(1);
+                }
+            } else {
+                WindowBuffer[y][x] = str[i]; // Put character
+                ++x; // Move cursor forward
+                // Check if it's the end of line
+                if (BR.x <= x) {
+                    // CRLF
+                    x = TL.x;
+                    ++y;
+                    if (BR.y <= y) {
+                        perror("RenderRange: Out of Bound");
+                        exit(1);
+                    }
+                }
             }
         }
     }
@@ -181,46 +210,10 @@ void RenderString(char *str, char **WindowBuffer, coor Window, coor Cursor) {
     return;
 }
 
-void RenderRange(char *str, char **WindowBuffer, coor Window, coor TL, coor BR) {
-    for (int i = TL.y; i <= BR.y; ++i)
-        for (int j = TL.x; j <= BR.x; ++j)
-            WindowBuffer[i][j] = ' ';
-    int x = TL.x, y = TL.y;
-    int len = strlen(str);
-    for(int i=0;i<len;++i) {
-        if (str[i] == '\n') {
-            // CRLF
-            x = TL.x;
-            ++y;
-        } else {
-            WindowBuffer[y][x] = str[i]; // Put character
-            ++x; // Move cursor forward
-            // Check if it's the end of line
-            if (BR.x <= x) {
-                // CRLF
-                x = TL.x;
-                ++y;
-            }
-        }
-    }
-    RenderFullWindow(WindowBuffer, Window, (coor){-1, -1});
-    return;
-}
-
-void RenderLine(char *str, coor Window, coor Cursor) {
-    HCursor();
-    CursorPos((coor){0, Cursor.y});
-    fwrite(str, sizeof(char), Window.x, stdout);
-    fflush(stdout);
-    CursorPos(Cursor);
-    SCursor();
-    return;
-}
-
 #ifdef HEADER_TEST
 
 int main(void) {
-    coor k = GetWindowSize();
+
     return 0;
 }
 

@@ -1,8 +1,8 @@
 all: main.c helper.c inputhandler.c outputhandler.c helper.h inputhandler.h outputhandler.h
-	gcc -c -o main.o main.c
 	gcc -c -o helper.o helper.c
 	gcc -c -o inputhandler.o inputhandler.c
 	gcc -c -o outputhandler.o outputhandler.c
+	gcc -c -o main.o main.c
 	gcc helper.o inputhandler.o outputhandler.o main.o
 
 helper: helper.c

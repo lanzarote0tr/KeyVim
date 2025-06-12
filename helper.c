@@ -1,3 +1,15 @@
+/* * * * * * * * * *
+ *
+ *  outputhandler.c
+ *  KeyVim
+ *
+ *  Created by Lanzarote(Ethan Won Cho) on 5/9/2025
+ *  
+ *  
+ *  README!
+ *  Do not compile this code as C++. If so, critical potential errors can occur. 
+ *
+ * * * * * * * * * */
 #include "helper.h"
 
 #include <stdio.h>     // printf, fprintf
@@ -46,7 +58,6 @@ void Threading(void *f1, void *f2) {
         fprintf(stderr, "Failed to create threads.\n");
         exit(1);
     }
-
     pthread_join(thread1, NULL);
     pthread_join(thread2, NULL);
 }

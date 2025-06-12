@@ -1,3 +1,15 @@
+/* * * * * * * * * *
+ *
+ *  inputhandler.c
+ *  KeyVim
+ *
+ *  Created by Lanzarote(Ethan Won Cho) on 5/9/2025
+ *  
+ *  
+ *  README!
+ *  Do not compile this code as C++. If so, critical potential errors can occur. 
+ *
+ * * * * * * * * * */
 #include "inputhandler.h"
 
 #include <stdio.h>
