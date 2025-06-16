@@ -11,9 +11,11 @@ void HCursor(void);
 void SCursor(void);
 
 char **InitWindowBuffer(coor w);
+char *InitFileBuffer(void);
 void KillWindowBuffer(char **Window_buffer, coor w);
 
 void RenderFullWindow(char **WindowBuffer, coor Window, coor Cursor);
 void RenderString(char *str, char **WindowBuffer, coor Window, coor Cursor);
 void RenderRange(char *str, char **WindowBuffer, coor Window, coor TL, coor BR, coor Cursor);
+void Putcharbuf(char c, char *FileBuffer, int FileCursor);
 

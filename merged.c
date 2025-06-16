@@ -26,6 +26,18 @@
 #endif
 
 /* begin helper.c */
+/* * * * * * * * * *
+ *
+ *  outputhandler.c
+ *  KeyVim
+ *
+ *  Created by Lanzarote(Ethan Won Cho) on 5/9/2025
+ *  
+ *  
+ *  README!
+ *  Do not compile this code as C++. If so, critical potential errors can occur. 
+ *
+ * * * * * * * * * */
 
 #include <stdio.h>     // printf, fprintf
 #include <stdlib.h>    // exit
@@ -73,7 +85,6 @@ void Threading(void *f1, void *f2) {
         fprintf(stderr, "Failed to create threads.\n");
         exit(1);
     }
-
     pthread_join(thread1, NULL);
     pthread_join(thread2, NULL);
 }
@@ -117,6 +128,18 @@ int main(void) {
 
 /* end helper.c */
 /* begin inputhandler.c */
+/* * * * * * * * * *
+ *
+ *  inputhandler.c
+ *  KeyVim
+ *
+ *  Created by Lanzarote(Ethan Won Cho) on 5/9/2025
+ *  
+ *  
+ *  README!
+ *  Do not compile this code as C++. If so, critical potential errors can occur. 
+ *
+ * * * * * * * * * */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -166,7 +189,19 @@ char Getchar(void) {
 
 /* end inputhandler.c */
 /* begin outputhandler.c */
-
+/* * * * * * * * * *
+ *
+ *  outputhandler.c
+ *  KeyVim
+ *
+ *  Created by Lanzarote(Ethan Won Cho) on 5/9/2025
+ *  
+ *  
+ *  README!
+ *  Do not compile this code as C++. If so, critical potential errors can occur. 
+ *  Un-comment the type definition of coor when merging with main.c
+ *
+ * * * * * * * * * */
 #ifndef _WIN32
 #include <termios.h>
 #include <sys/ioctl.h>
@@ -176,6 +211,13 @@ char Getchar(void) {
 #include <stdlib.h>
 #include <unistd.h>
 #include "helper.h"
+
+/* TODO: UN-COMMENT THIS AT MERGE
+typedef struct _coor { // Coordinates
+    unsigned int x;
+    unsigned int y;
+} coor;
+*/
 
 void ClearWindowBuffer(char **WindowBuffer, coor Window) { // VERIFIED
     for (int i = 0; i <= Window.y; ++i) {
@@ -293,6 +335,14 @@ char **InitWindowBuffer(coor Window) { // VERIFIED
     return Window_buffer;
 }
 
+char *InitFileBuffer(void) {
+    char *FileBuffer = (char*)malloc(10000 * sizeof(char*));
+    for(int i=0;i<10000;++i) {
+        FileBuffer[i] = '\0';
+    }
+    return FileBuffer;
+}
+
 void KillWindowBuffer(char **Window_buffer, coor w) { // VERIFIED
     for(int i=0;i<=w.y;++i) {
         free(Window_buffer[i]);
@@ -302,8 +352,6 @@ void KillWindowBuffer(char **Window_buffer, coor w) { // VERIFIED
 }
 
 void RenderFullWindow(char **WindowBuffer, coor Window, coor Cursor) {
-    if (Cursor.x == -1)
-        Cursor = GCursorPos();
     ClearScreen();
     HCursor();
     CursorPos((coor){0, 0});
@@ -324,23 +372,35 @@ void RenderFullWindow(char **WindowBuffer, coor Window, coor Cursor) {
     return;
 }
 
-void RenderString(char *str, char **WindowBuffer, coor Window, coor Cursor) {
-    ClearWindowBuffer(WindowBuffer, Window);
-    int x = 0, y = 0;
-    int len = strlen(str);
-    for(int i=0;i<len;++i) {
-        if (str[i] == '\n') {
-            // CRLF
-            x = 0;
-            ++y;
-        } else {
-            WindowBuffer[y][x] = str[i]; // Put character
-            ++x; // Move cursor forward
-            // Check if it's the end of line
-            if (Window.x <= x) {
+void RenderRange(char *str, char **WindowBuffer, coor Window, coor TL, coor BR, coor Cursor) {
+    for (int i = TL.y; i <= BR.y; ++i)
+        for (int j = TL.x; j <= BR.x; ++j)
+            WindowBuffer[i][j] = ' ';
+    int x = TL.x, y = TL.y;
+    if (str != NULL) {
+        int len = strlen(str);
+        for(int i=0;i<len;++i) {
+            if (str[i] == '\n') {
                 // CRLF
-                x = 0;
+                x = TL.x;
                 ++y;
+                if (BR.y <= y) {
+                    perror("RenderRange: Out of Bound");
+                    exit(1);
+                }
+            } else {
+                WindowBuffer[y][x] = str[i]; // Put character
+                ++x; // Move cursor forward
+                // Check if it's the end of line
+                if (BR.x <= x) {
+                    // CRLF
+                    x = TL.x;
+                    ++y;
+                    if (BR.y <= y) {
+                        perror("RenderRange: Out of Bound");
+                        exit(1);
+                    }
+                }
             }
         }
     }
@@ -348,46 +408,21 @@ void RenderString(char *str, char **WindowBuffer, coor Window, coor Cursor) {
     return;
 }
 
-void RenderRange(char *str, char **WindowBuffer, coor Window, coor TL, coor BR) {
-    for (int i = TL.y; i <= BR.y; ++i)
-        for (int j = TL.x; j <= BR.x; ++j)
-            WindowBuffer[i][j] = ' ';
-    int x = TL.x, y = TL.y;
-    int len = strlen(str);
-    for(int i=0;i<len;++i) {
-        if (str[i] == '\n') {
-            // CRLF
-            x = TL.x;
-            ++y;
-        } else {
-            WindowBuffer[y][x] = str[i]; // Put character
-            ++x; // Move cursor forward
-            // Check if it's the end of line
-            if (BR.x <= x) {
-                // CRLF
-                x = TL.x;
-                ++y;
-            }
-        }
+void Putcharbuf(char c, char *FileBuffer, int FileCursor) {
+    int len = strlen(FileBuffer);
+    char next = '\0';
+    for(int i=FileCursor;i<len;++i) {
+        next = FileBuffer[i+1];
+        FileBuffer[i+1] = FileBuffer[i];
     }
-    RenderFullWindow(WindowBuffer, Window, (coor){-1, -1});
-    return;
-}
-
-void RenderLine(char *str, coor Window, coor Cursor) {
-    HCursor();
-    CursorPos((coor){0, Cursor.y});
-    fwrite(str, sizeof(char), Window.x, stdout);
-    fflush(stdout);
-    CursorPos(Cursor);
-    SCursor();
+    FileBuffer[FileCursor] = c;
     return;
 }
 
 #ifdef HEADER_TEST
 
 int main(void) {
-    coor k = GetWindowSize();
+
     return 0;
 }
 
@@ -399,15 +434,17 @@ int main(void) {
 
 #define SHOWTITLE_DELAY 100
 
-void xsetup(void);
+void showtitle(void);
 
 struct termios *original;
 coor Window;
 char **WindowBuffer;
 coor Cursor;
-coor CommandInputCursor;
-char isCommandMode = 1;
+coor CICursor;
 char ESCCount = 0;
+char *FileBuffer;
+int FileCursor = 0;
+char samplecode1[] = "int convert_bit_range( int c, int from_bits, int to_bits )\n{\n\tint b = (1 << (from_bits - 1)) + c * ((1 << to_bits) - 1);\n\treturn (b + (b >> from_bits)) >> from_bits;\n}";
 
 void program_end(void) { // VERIFIED
 #ifndef _WIN32
@@ -419,94 +456,157 @@ void program_end(void) { // VERIFIED
     return;
 }
 
-void HandleChar(char c) {
-    // ESC, Function keys, backspace, tab, enter, arrow keys, keys with ^
-    if (c == 'q') exit(0);
-    if (isCommandMode == 1) { // Normal
+void HandleCommand(char *cmd) {
+    
+    return;
+}
+
+// ESC, Function keys, backspace, tab, enter, arrow keys, keys with ^
+
+void HandleCommandMode(void) {
+    CICursor = (coor){1, Window.y-2};
+    char command[30];
+    int cmdlength = 1;
+    while (1) {
+        char c = Getchar();
+        if (c == 'q') exit(0);
         switch (c) {
-        case 'i':
-            isCommandMode = 0;
-            HCursor();
-            strcpy(WindowBuffer[Window.y-1], "-- INSERT --\0");
-            RenderLine(WindowBuffer[Window.y-1], Window, (coor){12, Window.y-1});
-            CursorPos(Cursor);
-            SCursor();
-            break;
-        case ':':
-            isCommandMode = 2;
-            WindowBuffer[Window.y-1][0] = ':';
-            CommandInputCursor.x = 1;
-            CommandInputCursor.y = Window.y-1;
-            RenderLine(WindowBuffer[CommandInputCursor.y], Window, CommandInputCursor);
-            break;
-        }
-    } else if (isCommandMode == 2) { // After pressing colon or slash etc.
-        switch (c) {
-        case 27:
-            ++ESCCount;
-            if (ESCCount == 2) {
-                ESCCount = 0;
-                isCommandMode = 1;
-                HCursor();
-                strcpy(WindowBuffer[Window.y-1], "            ");
-                RenderLine(WindowBuffer[Window.y-1], Window, (coor){0, Window.y-1});
-                CursorPos(Cursor);
+        case 27: 
+            if (Getchar() == '[') {
+                char c2 = Getchar();
+                switch (c2) {
+                case 'A': // Up Arrow - Command History
+                    perror("Up Arrow");
+                    exit(1);
+                    break;
+                case 'B': // Down Arrow - Command History
+                    perror("Down Arrow");
+                    exit(1);
+                    break;
+                case 'C': // Right Arrow - Cursor Move
+                    perror("Right Arrow");
+                    exit(1);
+                    break;
+                case 'D': // Left Arrow - Cursor Move
+                    perror("Left Arrow");
+                    exit(1);
+                    break;
+                }
+            } else { // ESC - Back to Normal
+                RenderRange(NULL, WindowBuffer, Window, (coor){0, Window.y - 2}, (coor){20, Window.y - 2}, Cursor);
+                CICursor = (coor){0, Window.y-2};
+                return;
             }
-            break;
         case 8:
-            printf("asdf");
-            ESCCount = 0;
-            //if (Cursor.x > 0) {
-                WindowBuffer[Cursor.y][Cursor.x] = ' ';
-                Cursor.x -= 1;
-                RenderFullWindow(WindowBuffer, Window, Cursor);
-                // 뒤쪽에 있는 문자열 앞으로 옮기기
-            //}
+        case 127: // Backspace
+            CICursor.x -= 1;
+            if (CICursor.x > 0) {
+                WindowBuffer[CICursor.y][CICursor.x] = ' ';
+                RenderFullWindow(WindowBuffer, Window, CICursor);
+            } else { // Backspace until edge - Back to Normal
+                RenderRange(NULL, WindowBuffer, Window, (coor){0, Window.y - 2}, (coor){20, Window.y - 2}, Cursor);
+                CICursor = (coor){0, Window.y-1};
+                return;
+            }
+            // TODO: 뒤쪽의 문자열 앞으로 옮기기
             break;
+        case '\n': // Enter
+            RenderRange(NULL, WindowBuffer, Window, (coor){0, Window.y - 2}, (coor){20, Window.y - 2}, CICursor);
+            command[CICursor.x] = '\0';
+            HandleCommand(command);
+            CICursor = (coor){0, Window.y-1};
+            return;
+        default:
+            // RTR (real time render)
+            WindowBuffer[CICursor.y][CICursor.x] = c;
+            command[CICursor.x-1] = c;
+            ++CICursor.x;
+            if (CICursor.x >= Window.x) {
+                CICursor.x = 0;
+                ++CICursor.y;
+            }
+            RenderRange(command, WindowBuffer, Window, (coor){0, Window.y - 2}, (coor){20, Window.y - 2}, CICursor);
+            // RenderLine(WindowBuffer[CICursor.y], Window, CICursor);
         }
-        // RTR (real time render)
-        WindowBuffer[CommandInputCursor.y][CommandInputCursor.x] = c;
-        ++CommandInputCursor.x;
-        if (CommandInputCursor.x >= Window.x) {
-            CommandInputCursor.x = 0;
-            ++CommandInputCursor.y;
-        }
-        RenderLine(WindowBuffer[CommandInputCursor.y], Window, CommandInputCursor);
-    } else { // INSERT MODE
-        if (c == 27) { // ESC key
-            isCommandMode = 1;
-            HCursor();
-            strcpy(WindowBuffer[Window.y-1], "             ");
-            RenderLine(WindowBuffer[Window.y-1], Window, (coor){0, Window.y-1});
-            CursorPos(Cursor);
-        } else {
-            // RTR
-            WindowBuffer[Cursor.y][Cursor.x] = c;
+    }
+}
+
+void HandleInsertMode(void) {
+    while (1) {
+        char c = Getchar();
+        if (c == 'q') exit(0);
+        switch (c) {
+        case 27: // ESC
+            RenderRange("              ", WindowBuffer, Window, (coor){0, Window.y - 2}, (coor){20, Window.y - 2}, Cursor);
+            return;
+        case 8:
+        case 127: // Backspace
+            WindowBuffer[Cursor.y][Cursor.x-1] = ' ';
+            if (Cursor.x > 0)
+                Cursor.x -= 1;
+            else
+                Cursor.x = Window.x - 1;
+                RenderFullWindow(WindowBuffer, Window, Cursor);
+                // TODO: 뒤쪽의 문자열 앞으로 옮기기
+            break;
+        default: // Render Real Time
+            Putcharbuf(c, FileBuffer, FileCursor);
+            ++FileCursor;
             ++Cursor.x;
             if (Cursor.x >= Window.x) {
                 Cursor.x = 0;
                 ++Cursor.y;
+                // PrintError(""); TODO: OutofBound error
             }
-            RenderLine(WindowBuffer[Cursor.y], Window, Cursor);
+            RenderRange(FileBuffer, WindowBuffer, Window, (coor){0, 0}, (coor){Window.x / 2, Window.y-3}, Cursor);
         }
     }
 }
 
-void game(void) {
-    Clear(WindowBuffer, Window);
-    Cursor.x = 0;
-    Cursor.y = 0;
+void HandleNormalMode(void) {
     while (1) {
         char c = Getchar();
-        HCursor();
-        HandleChar(c);
+        if (c == 'q') exit(0);
+        switch (c) {
+        case 'i':
+            RenderRange("-- INSERT --", WindowBuffer, Window, (coor){0, Window.y - 2}, (coor){20, Window.y - 2}, Cursor);
+            HandleInsertMode();
+            break;
+        case ':':
+            WindowBuffer[Window.y-2][0] = ':';
+            CICursor.x = 1;
+            CICursor.y = Window.y-1;
+            RenderFullWindow(WindowBuffer, Window, CICursor);
+            HandleCommandMode();
+            break;
+        }
+    }
+}
+
+void RenderTimer(void) {
+    char str[10];
+    for (int i=0;i<100;++i) {
+        sprintf(str, "Time: %02d", i);
+        RenderRange(str, WindowBuffer, Window, (coor){0, Window.y-1}, (coor){20, Window.y-2}, Cursor);
+        Wait(1000);
     }
     return;
 }
 
+void game(void) {
+    ClearScreen();
+    ClearWindowBuffer(WindowBuffer, Window);
+    FileBuffer = InitFileBuffer();
+    Cursor = (coor){0, 0};
+    Threading(HandleNormalMode, RenderTimer);
+    return;
+}
+
 int options(void) {
-    RenderString("Welcome to KeyVim!\n[S] Start Game\n[O] Options\n[T] Tutorial\n[Q] Exit\nSelect an option: ", WindowBuffer, Window, (coor){18, 5});
+    RenderRange("Welcome to KeyVim!\n[S] Start Game\n[O] Options\n[T] Tutorial\n[Q] Exit\nSelect an option: ", WindowBuffer, Window, (coor){0, 0}, (coor){19, 7}, (coor){18, 5});
     char input = Getchar();
+    printf("%c", input);
+    Wait(SHOWTITLE_DELAY);
     switch(input) {
     case 'S':
     case 's':
@@ -541,14 +641,14 @@ int main(void) {
     WindowBuffer = InitWindowBuffer(Window);
     ClearWindowBuffer(WindowBuffer, Window);
     showtitle();
-    ClearWindow();
+    ClearScreen();
     options();
     return 0;
 }
 
 
 void showtitle(void) {
-    Clear(WindowBuffer, Window);
+    ClearScreen();
     printf("  _  __\n"
            " | |/ /\n"
            " | ' / \n"
@@ -557,7 +657,7 @@ void showtitle(void) {
            " |_|\\_\\\n");
     Wait(SHOWTITLE_DELAY);
 
-    Clear(WindowBuffer, Window);
+    ClearScreen();
     printf("  _  __\n"
            " | |/ /\n"
            " | ' / ___\n"
@@ -566,7 +666,7 @@ void showtitle(void) {
            " |_|\\_\\___|\n");
     Wait(SHOWTITLE_DELAY);
 
-    Clear(WindowBuffer, Window);
+    ClearScreen();
     printf("  _  __  \n"
            " | |/ /  \n"
            " | ' / ___ _   _ \n"
@@ -577,7 +677,7 @@ void showtitle(void) {
            "           |___/    \n");
     Wait(SHOWTITLE_DELAY);
     
-    Clear(WindowBuffer, Window);
+    ClearScreen();
     printf("  _  __       __      __\n"
            " | |/ /       \\ \\    / /\n"
            " | ' / ___ _   \\ \\  / / \n"
@@ -588,7 +688,7 @@ void showtitle(void) {
            "           |___/       \n");
     Wait(SHOWTITLE_DELAY);
 
-    Clear(WindowBuffer, Window);
+    ClearScreen();
     printf("  _  __       __      ___ \n"
            " | |/ /       \\ \\    / (_)\n"
            " | ' / ___ _   \\ \\  / / _ \n"
@@ -599,7 +699,7 @@ void showtitle(void) {
            "           |___/        \n");
     Wait(SHOWTITLE_DELAY);
 
-    Clear(WindowBuffer, Window);
+    ClearScreen();
     printf("  _  __       __      ___  \n"
            " | |/ /       \\ \\    / (_)\n"
            " | ' / ___ _   \\ \\  / / _ _ __ ___\n"
@@ -610,6 +710,4 @@ void showtitle(void) {
            "           |___/                   \n");
     Wait(SHOWTITLE_DELAY);
 }
-
-
 

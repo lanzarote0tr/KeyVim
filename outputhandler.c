@@ -19,8 +19,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include "helper.h"
+#include <unistd.h>
 
 /* TODO: UN-COMMENT THIS AT MERGE
 typedef struct _coor { // Coordinates
@@ -49,7 +49,7 @@ coor GetWindowSize(void) { // VERIFIED
 #else
     struct winsize w;
     coor size;
-    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    int returnvalue = ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
     size.x = w.ws_col, 
     size.y = w.ws_row;
     return size;
@@ -145,6 +145,14 @@ char **InitWindowBuffer(coor Window) { // VERIFIED
     return Window_buffer;
 }
 
+char *InitFileBuffer(void) {
+    char *FileBuffer = (char*)malloc(10000 * sizeof(char*));
+    for(int i=0;i<10000;++i) {
+        FileBuffer[i] = '\0';
+    }
+    return FileBuffer;
+}
+
 void KillWindowBuffer(char **Window_buffer, coor w) { // VERIFIED
     for(int i=0;i<=w.y;++i) {
         free(Window_buffer[i]);
@@ -175,10 +183,11 @@ void RenderFullWindow(char **WindowBuffer, coor Window, coor Cursor) {
 }
 
 void RenderRange(char *str, char **WindowBuffer, coor Window, coor TL, coor BR, coor Cursor) {
-    for (int i = TL.y; i <= BR.y; ++i)
-        for (int j = TL.x; j <= BR.x; ++j)
+    for (int i = TL.y; i < BR.y-1; ++i)
+        for (int j = TL.x; j < BR.x-1; ++j)
             WindowBuffer[i][j] = ' ';
-    int x = TL.x, y = TL.y;
+    int x = TL.x;
+    int y = TL.y;
     if (str != NULL) {
         int len = strlen(str);
         for(int i=0;i<len;++i) {
@@ -207,6 +216,17 @@ void RenderRange(char *str, char **WindowBuffer, coor Window, coor TL, coor BR, 
         }
     }
     RenderFullWindow(WindowBuffer, Window, Cursor);
+    return;
+}
+
+void Putcharbuf(char c, char *FileBuffer, int FileCursor) {
+    int len = strlen(FileBuffer);
+    char next = '\0';
+    for(int i=FileCursor;i<len;++i) {
+        next = FileBuffer[i+1];
+        FileBuffer[i+1] = FileBuffer[i];
+    }
+    FileBuffer[FileCursor] = c;
     return;
 }
 
