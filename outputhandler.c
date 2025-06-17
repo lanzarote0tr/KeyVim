@@ -32,7 +32,7 @@ typedef struct _coor { // Coordinates
 void ClearWindowBuffer(char **WindowBuffer, coor Window) { // VERIFIED
     for (int i = 0; i <= Window.y; ++i) {
         for (int j = 0; j < Window.x; ++j) {
-            WindowBuffer[i][j] = '\0';
+            WindowBuffer[i][j] = ' ';
         }
         WindowBuffer[i][Window.x] = '\0';
     }
@@ -56,6 +56,7 @@ coor GetWindowSize(void) { // VERIFIED
 #endif
 }
 
+// CURSOR
 coor GCursorPos(void) {
 #ifdef _WIN32
     coor pos = {0, 0};
@@ -126,6 +127,40 @@ void SCursor(void) {
     fflush(stdout);
 #endif
     return;
+}
+
+int MoveCursor(int k, coor *cursor, coor Scope) { // TODO: character detect and respond as is
+    switch (k) {
+    case 1: // Up Arrow
+        if (cursor->y > 0) {
+            --cursor->y;
+            return 0;
+        } else
+            return 1;
+        break;
+    case 2: // Down Arrow
+        if (cursor->y < Scope.y) {
+            ++cursor->y;
+            return 0;
+        } else
+            return 1;
+        break;
+    case 3: // Right Arrow
+        if (cursor->x < Scope.x) {
+            ++cursor->x;
+            return 0;
+        } else
+            return 1;
+        break;
+    case 4: // Left Arrow
+        if (cursor->x > 0) {
+            --cursor->x;
+            return 0;
+        } else
+            return 1;
+        break;
+    }
+    return 2;
 }
 
 
@@ -219,7 +254,7 @@ void RenderRange(char *str, char **WindowBuffer, coor Window, coor TL, coor BR, 
     return;
 }
 
-void Putcharbuf(char c, char *FileBuffer, int FileCursor) {
+void PutCharBuf(char c, char *FileBuffer, int FileCursor) {
     int len = strlen(FileBuffer);
     char next = '\0';
     for(int i=FileCursor;i<len;++i) {

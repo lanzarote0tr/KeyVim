@@ -40,7 +40,7 @@ coor CICursor;
 char FLAG = 0;
 char *FileBuffer;
 int FileCursor = 0;
-char SampleCode1[] = "int convert_bit_range( int c, int from_bits, int to_bits )\n{\n\tint b = (1 << (from_bits - 1)) + c * ((1 << to_bits) - 1);\n\treturn (b + (b >> from_bits)) >> from_bits;\n}";
+char SampleCode1[] = "int convert_bit_range( int c, int from_bits, int to_bits ) {\n    int b = (1 << (from_bits - 1)) + c * ((1 << to_bits) - 1);\n    return (b + (b >> from_bits)) >> from_bits;\n}";
 
 void program_end(void) { // VERIFIED
 #ifndef _WIN32
@@ -55,7 +55,7 @@ void program_end(void) { // VERIFIED
 void DrawSampleCode(void) {
     Cursor.x = 0;
     Cursor.y = 0;
-    RenderRange(SampleCode1, WindowBuffer, Window, (coor){150, 1}, (coor){Window.x, Window.y-2}, Cursor);
+    RenderRange(SampleCode1, WindowBuffer, Window, (coor){Window.x/2, 0}, (coor){Window.x, Window.y-3}, Cursor);
     return;
 }
 
@@ -75,34 +75,29 @@ void HandleCommandMode(void) {
         if (c == 'q') exit(0);
         switch (c) {
         case 27: 
-            if (Getchar() == '[') {
-                char c2 = Getchar();
-                switch (c2) {
-                case 'A': // Up Arrow - Command History
-                    perror("Up Arrow");
-                    exit(1);
-                    break;
-                case 'B': // Down Arrow - Command History
-                    perror("Down Arrow");
-                    exit(1);
-                    break;
-                case 'C': // Right Arrow - Cursor Move
-                    perror("Right Arrow");
-                    exit(1);
-                    break;
-                case 'D': // Left Arrow - Cursor Move
-                    perror("Left Arrow");
-                    exit(1);
-                    break;
-                }
-            } else { // ESC - Back to Normal
-                RenderRange(NULL, WindowBuffer, Window, (coor){0, Window.y - 2}, (coor){20, Window.y - 2}, Cursor);
-                CICursor = (coor){0, Window.y-2};
-                return;
-            }
+            RenderRange(NULL, WindowBuffer, Window, (coor){0, Window.y - 2}, (coor){20, Window.y - 2}, Cursor);
+            CICursor = (coor){0, Window.y-2};
+            return;
+            break;
+        case KEY_UP: // Up Arrow
+            perror("Up Arrow");
+            exit(1);
+            break;
+        case KEY_DOWN: // Down Arrow
+            perror("Down Arrow");
+            exit(1);
+            break;
+        case KEY_RIGHT: // Right Arrow
+            perror("Right Arrow");
+            exit(1);
+            break;
+        case KEY_LEFT: // Left Arrow
+            perror("Left Arrow");
+            exit(1);
+            break;
         case 8:
         case 127: // Backspace
-            CICursor.x -= 1;
+            CICursor.x -= 2;
             if (CICursor.x > 0) {
                 WindowBuffer[CICursor.y][CICursor.x] = ' ';
                 RenderFullWindow(WindowBuffer, Window, CICursor);
@@ -137,6 +132,7 @@ void HandleCommandMode(void) {
 void HandleInsertMode(void) {
     while (1) {
         char c = Getchar();
+        int len;
         if (c == 'q') exit(0);
         switch (c) {
         case 27: // ESC
@@ -144,24 +140,26 @@ void HandleInsertMode(void) {
             return;
         case 8:
         case 127: // Backspace
-            WindowBuffer[Cursor.y][Cursor.x-1] = ' ';
-            if (Cursor.x > 0)
-                Cursor.x -= 1;
-            else
-                Cursor.x = Window.x - 1;
-                RenderFullWindow(WindowBuffer, Window, Cursor);
-                // TODO: 뒤쪽의 문자열 앞으로 옮기기
+            len = strlen(FileBuffer);
+            for (int i=FileCursor-1;i<=len;++i) {
+                FileBuffer[i] = FileBuffer[i+1];
+            }
+            FileBuffer[len] = '\0';
+            --FileCursor;
+            MoveCursor(4, &Cursor, (coor){Window.x / 2 - 1, Window.y - 3});
+            RenderRange(FileBuffer, WindowBuffer, Window, (coor){0, 0}, (coor){Window.x / 2-1, Window.y-3}, Cursor);
+            // TODO: 뒤쪽의 문자열 앞으로 옮기기
             break;
         default: // Render Real Time
-            Putcharbuf(c, FileBuffer, FileCursor);
+            PutCharBuf(c, FileBuffer, FileCursor);
             ++FileCursor;
             ++Cursor.x;
-            if (Cursor.x >= Window.x) {
+            if (Cursor.x >= Window.x / 2 - 1) {
                 Cursor.x = 0;
                 ++Cursor.y;
                 // PrintError(""); TODO: OutofBound error
             }
-            RenderRange(FileBuffer, WindowBuffer, Window, (coor){0, 0}, (coor){Window.x / 2, Window.y-3}, Cursor);
+            RenderRange(FileBuffer, WindowBuffer, Window, (coor){0, 0}, (coor){Window.x / 2-1, Window.y-3}, Cursor);
         }
     }
 }
@@ -171,7 +169,28 @@ void HandleNormalMode(void) {
         char c = Getchar();
         if (c == 'q') exit(0);
         switch (c) {
+        case KEY_UP: // Up Arrow
+            MoveCursor(1, &Cursor, (coor){Window.x / 2 - 1, Window.y-3});
+            CursorPos(Cursor);
+            break;
+        case KEY_DOWN: // Down Arrow
+            MoveCursor(2, &Cursor, (coor){Window.x / 2 - 1, Window.y-3});
+            CursorPos(Cursor);
+            break;
+        case KEY_RIGHT: // Right Arrow
+            MoveCursor(3, &Cursor, (coor){Window.x / 2 - 1, Window.y-3});
+            CursorPos(Cursor);
+            break;
+        case KEY_LEFT: // Left Arrow
+            MoveCursor(4, &Cursor, (coor){Window.x / 2 - 1, Window.y-3});
+            CursorPos(Cursor);
+            break;
         case 'i':
+            RenderRange("-- INSERT --", WindowBuffer, Window, (coor){0, Window.y - 2}, (coor){20, Window.y - 2}, Cursor);
+            HandleInsertMode();
+            break;
+        case 'a':
+            ++Cursor.x;
             RenderRange("-- INSERT --", WindowBuffer, Window, (coor){0, Window.y - 2}, (coor){20, Window.y - 2}, Cursor);
             HandleInsertMode();
             break;
