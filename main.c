@@ -40,7 +40,9 @@ coor CICursor;
 char FLAG = 0;
 char *FileBuffer;
 int FileCursor = 0;
-char SampleCode1[] = "int convert_bit_range( int c, int from_bits, int to_bits ) {\n    int b = (1 << (from_bits - 1)) + c * ((1 << to_bits) - 1);\n    return (b + (b >> from_bits)) >> from_bits;\n}";
+int IsCommandMode = 0;
+char SampleCode1[] = "asdf\nbrooo";
+char SampleCode2[] = "int convert_bit_range( int c, int from_bits, int to_bits ) {\n    int b = (1 << (from_bits - 1)) + c * ((1 << to_bits) - 1);\n    return (b + (b >> from_bits)) >> from_bits;\n}";
 
 void program_end(void) { // VERIFIED
 #ifndef _WIN32
@@ -59,17 +61,22 @@ void DrawSampleCode(void) {
     return;
 }
 
-void HandleCommand(char *cmd) {
-    
-    return;
+int HandleCommand(char *cmd) {
+    if (!strcmp(cmd, ":submit")) {
+        if(!strcmp(FileBuffer, SampleCode1)) {
+            return 1;
+        } else return 2;
+    }
+    return 0;
 }
 
 // ESC, Function keys, backspace, tab, enter, arrow keys, keys with ^
 
-void HandleCommandMode(void) {
+int HandleCommandMode(void) {
+    IsCommandMode = 1;
     CICursor = (coor){1, Window.y-2};
     char command[30];
-    int cmdlength = 1;
+    command[0] = ':';
     while (1) {
         char c = Getchar();
         if (c == 'q') exit(0);
@@ -77,7 +84,8 @@ void HandleCommandMode(void) {
         case 27: 
             RenderRange(NULL, WindowBuffer, Window, (coor){0, Window.y - 2}, (coor){20, Window.y - 2}, Cursor);
             CICursor = (coor){0, Window.y-2};
-            return;
+            IsCommandMode = 0;
+            return 0;
             break;
         case KEY_UP: // Up Arrow
             perror("Up Arrow");
@@ -97,27 +105,38 @@ void HandleCommandMode(void) {
             break;
         case 8:
         case 127: // Backspace
-            CICursor.x -= 2;
+            --CICursor.x;
             if (CICursor.x > 0) {
                 WindowBuffer[CICursor.y][CICursor.x] = ' ';
                 RenderFullWindow(WindowBuffer, Window, CICursor);
             } else { // Backspace until edge - Back to Normal
                 RenderRange(NULL, WindowBuffer, Window, (coor){0, Window.y - 2}, (coor){20, Window.y - 2}, Cursor);
-                CICursor = (coor){0, Window.y-1};
-                return;
+                CICursor = (coor){0, Window.y-2};
+                IsCommandMode = 0;
+                return 0;
             }
             // TODO: 뒤쪽의 문자열 앞으로 옮기기
             break;
         case '\n': // Enter
             RenderRange(NULL, WindowBuffer, Window, (coor){0, Window.y - 2}, (coor){20, Window.y - 2}, CICursor);
             command[CICursor.x] = '\0';
-            HandleCommand(command);
-            CICursor = (coor){0, Window.y-1};
-            return;
+            int rst = HandleCommand(command);
+            IsCommandMode = 0;
+            switch (rst) {
+            case 0: // No Problem
+                CICursor = (coor){0, Window.y-2};
+                return 0;
+                break;
+            case 1: // Success Submit!!
+                return 1;
+                break;
+            case 2: // Fail Submit!!
+                return 2;
+                break;
+            }
         default:
             // RTR (real time render)
-            WindowBuffer[CICursor.y][CICursor.x] = c;
-            command[CICursor.x-1] = c;
+            PutCharBuf(c, command, CICursor.x);
             ++CICursor.x;
             if (CICursor.x >= Window.x) {
                 CICursor.x = 0;
@@ -146,18 +165,29 @@ void HandleInsertMode(void) {
             }
             FileBuffer[len] = '\0';
             --FileCursor;
-            MoveCursor(4, &Cursor, (coor){Window.x / 2 - 1, Window.y - 3});
+            if (MoveCursor(KEY_LEFT, &Cursor, (coor){Window.x / 2 - 1, Window.y - 3})) {
+                MoveCursor(KEY_UP, &Cursor, (coor){Window.x / 2 - 1, Window.y - 3});
+                while (!MoveCursor(KEY_RIGHT, &Cursor, (coor){Window.x / 2 - 1, Window.y - 3})) continue;
+                
+            }
             RenderRange(FileBuffer, WindowBuffer, Window, (coor){0, 0}, (coor){Window.x / 2-1, Window.y-3}, Cursor);
             // TODO: 뒤쪽의 문자열 앞으로 옮기기
+            break;
+        case '\n':
+            PutCharBuf('\n', FileBuffer, FileCursor);
+            ++FileCursor;
+            while (!MoveCursor(KEY_LEFT, &Cursor, (coor){Window.x / 2 - 1, Window.y - 3}))
+                continue;
+            MoveCursor(KEY_DOWN, &Cursor, (coor){Window.x / 2 - 1, Window.y - 3});
+            CursorPos(Cursor);
             break;
         default: // Render Real Time
             PutCharBuf(c, FileBuffer, FileCursor);
             ++FileCursor;
             ++Cursor.x;
             if (Cursor.x >= Window.x / 2 - 1) {
-                Cursor.x = 0;
-                ++Cursor.y;
-                // PrintError(""); TODO: OutofBound error
+                perror("OutofBound");
+                exit(1);
             }
             RenderRange(FileBuffer, WindowBuffer, Window, (coor){0, 0}, (coor){Window.x / 2-1, Window.y-3}, Cursor);
         }
@@ -170,18 +200,22 @@ void HandleNormalMode(void) {
         if (c == 'q') exit(0);
         switch (c) {
         case KEY_UP: // Up Arrow
+        case 'k':
             MoveCursor(1, &Cursor, (coor){Window.x / 2 - 1, Window.y-3});
             CursorPos(Cursor);
             break;
         case KEY_DOWN: // Down Arrow
+        case 'j':
             MoveCursor(2, &Cursor, (coor){Window.x / 2 - 1, Window.y-3});
             CursorPos(Cursor);
             break;
         case KEY_RIGHT: // Right Arrow
+        case 'l':
             MoveCursor(3, &Cursor, (coor){Window.x / 2 - 1, Window.y-3});
             CursorPos(Cursor);
             break;
         case KEY_LEFT: // Left Arrow
+        case 'h':
             MoveCursor(4, &Cursor, (coor){Window.x / 2 - 1, Window.y-3});
             CursorPos(Cursor);
             break;
@@ -197,9 +231,13 @@ void HandleNormalMode(void) {
         case ':':
             WindowBuffer[Window.y-2][0] = ':';
             CICursor.x = 1;
-            CICursor.y = Window.y-1;
+            CICursor.y = Window.y-2;
             RenderFullWindow(WindowBuffer, Window, CICursor);
-            HandleCommandMode();
+            int rst = HandleCommandMode();
+            if (rst == 1) {
+                ClearScreen();
+                return;
+            }
             break;
         }
     }
@@ -207,12 +245,14 @@ void HandleNormalMode(void) {
 
 void RenderTimer(void) {
     char str[10];
-    for (int i=0;i<100;++i) {
+    for (int i=0;i<10;++i) {
         sprintf(str, "Time: %02d", i);
-        RenderRange(str, WindowBuffer, Window, (coor){0, Window.y-1}, (coor){20, Window.y-2}, Cursor);
+        if (IsCommandMode)
+            RenderRange(str, WindowBuffer, Window, (coor){0, Window.y-1}, (coor){20, Window.y-2}, CICursor);
+        else
+            RenderRange(str, WindowBuffer, Window, (coor){0, Window.y-1}, (coor){20, Window.y-2}, Cursor);
         Wait(1000);
     }
-    
     return;
 }
 
@@ -223,6 +263,7 @@ void game(void) {
     Cursor = (coor){0, 0};
     DrawSampleCode();
     Threading(HandleNormalMode, RenderTimer);
+    RenderRange("Congratulations!", WindowBuffer, Window, (coor){0, 0}, (coor){50, 0}, (coor){4, 4});
     return;
 }
 

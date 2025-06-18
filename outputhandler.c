@@ -218,8 +218,8 @@ void RenderFullWindow(char **WindowBuffer, coor Window, coor Cursor) {
 }
 
 void RenderRange(char *str, char **WindowBuffer, coor Window, coor TL, coor BR, coor Cursor) {
-    for (int i = TL.y; i < BR.y-1; ++i)
-        for (int j = TL.x; j < BR.x-1; ++j)
+    for (int i = TL.y+1; i < BR.y; ++i)
+        for (int j = TL.x+1; j < BR.x; ++j)
             WindowBuffer[i][j] = ' ';
     int x = TL.x;
     int y = TL.y;
@@ -257,7 +257,7 @@ void RenderRange(char *str, char **WindowBuffer, coor Window, coor TL, coor BR, 
 void PutCharBuf(char c, char *FileBuffer, int FileCursor) {
     int len = strlen(FileBuffer);
     char next = '\0';
-    for(int i=FileCursor;i<len;++i) {
+    for(int i=FileCursor;i<=len;++i) {
         next = FileBuffer[i+1];
         FileBuffer[i+1] = FileBuffer[i];
     }
