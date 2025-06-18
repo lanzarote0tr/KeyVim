@@ -41,6 +41,8 @@ char FLAG = 0;
 char *FileBuffer;
 int FileCursor = 0;
 int IsCommandMode = 0;
+int CUtime;
+int ThreadFlag = 0;
 char SampleCode1[] = "asdf\nbrooo";
 char SampleCode2[] = "int convert_bit_range( int c, int from_bits, int to_bits ) {\n    int b = (1 << (from_bits - 1)) + c * ((1 << to_bits) - 1);\n    return (b + (b >> from_bits)) >> from_bits;\n}";
 
@@ -76,6 +78,7 @@ int HandleCommandMode(void) {
     IsCommandMode = 1;
     CICursor = (coor){1, Window.y-2};
     char command[30];
+    for (int i=0;i<30;++i) command[i] = '\0';
     command[0] = ':';
     while (1) {
         char c = Getchar();
@@ -151,7 +154,6 @@ int HandleCommandMode(void) {
 void HandleInsertMode(void) {
     while (1) {
         char c = Getchar();
-        int len;
         if (c == 'q') exit(0);
         switch (c) {
         case 27: // ESC
@@ -159,13 +161,9 @@ void HandleInsertMode(void) {
             return;
         case 8:
         case 127: // Backspace
-            len = strlen(FileBuffer);
-            for (int i=FileCursor-1;i<=len;++i) {
-                FileBuffer[i] = FileBuffer[i+1];
-            }
-            FileBuffer[len] = '\0';
+            DelCharBuf(FileBuffer, FileCursor);
             --FileCursor;
-            if (MoveCursor(KEY_LEFT, &Cursor, (coor){Window.x / 2 - 1, Window.y - 3})) {
+            if (MoveCursor(KEY_LEFT, &Cursor, (coor){Window.x / 2 - 1, Window.y - 3})) { // TODO : Unexpected Behavior
                 MoveCursor(KEY_UP, &Cursor, (coor){Window.x / 2 - 1, Window.y - 3});
                 while (!MoveCursor(KEY_RIGHT, &Cursor, (coor){Window.x / 2 - 1, Window.y - 3})) continue;
                 
@@ -235,7 +233,9 @@ void HandleNormalMode(void) {
             RenderFullWindow(WindowBuffer, Window, CICursor);
             int rst = HandleCommandMode();
             if (rst == 1) {
+                ClearWindowBuffer(WindowBuffer, Window);
                 ClearScreen();
+                ThreadFlag = 1;
                 return;
             }
             break;
@@ -244,14 +244,15 @@ void HandleNormalMode(void) {
 }
 
 void RenderTimer(void) {
+    CUtime = 0;
     char str[10];
-    for (int i=0;i<10;++i) {
-        sprintf(str, "Time: %02d", i);
+    while (!ThreadFlag) {
+        sprintf(str, "Time: %02d", CUtime);
         if (IsCommandMode)
             RenderRange(str, WindowBuffer, Window, (coor){0, Window.y-1}, (coor){20, Window.y-2}, CICursor);
-        else
-            RenderRange(str, WindowBuffer, Window, (coor){0, Window.y-1}, (coor){20, Window.y-2}, Cursor);
+        else RenderRange(str, WindowBuffer, Window, (coor){0, Window.y-1}, (coor){20, Window.y-2}, Cursor);
         Wait(1000);
+        ++CUtime;
     }
     return;
 }
@@ -263,36 +264,10 @@ void game(void) {
     Cursor = (coor){0, 0};
     DrawSampleCode();
     Threading(HandleNormalMode, RenderTimer);
-    RenderRange("Congratulations!", WindowBuffer, Window, (coor){0, 0}, (coor){50, 0}, (coor){4, 4});
+    char CongMessage[100];
+    sprintf(CongMessage, "Congratulations! You wrote in %d seconds!", CUtime);
+    RenderRange(CongMessage, WindowBuffer, Window, (coor){0, 0}, (coor){50, 0}, (coor){4, 4});
     return;
-}
-
-int options(void) {
-    RenderRange("Welcome to KeyVim!\n[S] Start Game\n[O] Options\n[T] Tutorial\n[Q] Exit\nSelect an option: ", WindowBuffer, Window, (coor){0, 0}, (coor){19, 7}, (coor){18, 5});
-    char input = Getchar();
-    printf("%c", input);
-    Wait(SHOWTITLE_DELAY);
-    switch(input) {
-    case 'S':
-    case 's':
-        game();
-        break;
-    case 'O':
-    case 'o':
-        return 1;
-        break;
-    case 'T':
-    case 't':
-        return 2;
-        break;
-    case 'Q':
-    case 'q':
-        exit(0);
-    default:
-        printf("This option is not available. Please select again.\n");
-        return options();
-    }
-    return -1;
 }
 
 int main(void) {
@@ -308,7 +283,31 @@ int main(void) {
     WindowBuffer = InitWindowBuffer(Window);
     ClearWindowBuffer(WindowBuffer, Window);
     ClearScreen();
-    options();
+    while (1) {
+        RenderRange("Welcome to KeyVim!\n[S] Start Game\n[O] Options\n[T] Tutorial\n[Q] Exit\nSelect an option: ", WindowBuffer, Window, (coor){0, 0}, (coor){19, 7}, (coor){18, 5});
+        char input = Getchar();
+        printf("%c", input);
+        Wait(SHOWTITLE_DELAY);
+        switch(input) {
+        case 'S':
+        case 's':
+            game();
+            break;
+        case 'O':
+        case 'o':
+            // options();
+            break;
+        case 'T':
+        case 't':
+            break;
+        case 'Q':
+        case 'q':
+            exit(0);
+        default:
+            printf("This option is not available. Please select again.\n");
+            Wait(1000);
+        }
+    }
     return 0;
 }
 
