@@ -19,6 +19,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+// COMMENT THIS AT MERGE
 #include "helper.h"
 #include <unistd.h>
 
@@ -217,9 +218,19 @@ void RenderFullWindow(char **WindowBuffer, coor Window, coor Cursor) {
     return;
 }
 
-void RenderRange(char *str, char **WindowBuffer, coor Window, coor TL, coor BR, coor Cursor) {
-    for (int i = TL.y+1; i < BR.y; ++i)
-        for (int j = TL.x+1; j < BR.x; ++j)
+void RenderLine(const char *line, coor Window, int y) {
+    CursorPos((coor){0, y});
+    fwrite(line, 1, strnlen(line, Window.x), stdout);
+    if (strlen(line) < (size_t)Window.x)
+        for (int i = strlen(line); i < Window.x; ++i)
+            fputc(' ', stdout);
+
+    fflush(stdout);
+}
+
+void RenderRange(const char *str, char **WindowBuffer, coor Window, coor TL, coor BR, coor Cursor) {
+    for (int i = TL.y; i <= BR.y; ++i)
+        for (int j = TL.x; j <= BR.x; ++j)
             WindowBuffer[i][j] = ' ';
     int x = TL.x;
     int y = TL.y;
@@ -250,19 +261,32 @@ void RenderRange(char *str, char **WindowBuffer, coor Window, coor TL, coor BR, 
             }
         }
     }
-    RenderFullWindow(WindowBuffer, Window, Cursor);
+    if (TL.y != BR.y) {
+        RenderFullWindow(WindowBuffer, Window, Cursor);
+    } else {
+        RenderLine(WindowBuffer[TL.y], Window, TL.y);
+    }
     return;
 }
 
 void PutCharBuf(char c, char *FileBuffer, int FileCursor) {
     int len = strlen(FileBuffer);
-    char next = '\0';
-    for(int i=FileCursor;i<=len;++i) {
-        next = FileBuffer[i+1];
-        FileBuffer[i+1] = FileBuffer[i];
-    }
+    if (FileCursor < 0) FileCursor = 0;
+    if (FileCursor > len) FileCursor = len;
+
+    /* shift right, including the NUL terminator */
+    for (int i = len; i >= FileCursor; --i)
+        FileBuffer[i + 1] = FileBuffer[i];
+
     FileBuffer[FileCursor] = c;
-    return;
+}
+
+void DelCharBuf(char *FileBuffer, int FileCursor) {
+    int len = strlen(FileBuffer);
+    for (int i=FileCursor-1;i<=len;++i) {
+        FileBuffer[i] = FileBuffer[i+1];
+    }
+    FileBuffer[len] = '\0';
 }
 
 #ifdef HEADER_TEST

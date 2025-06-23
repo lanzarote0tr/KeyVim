@@ -56,17 +56,19 @@ char Getchar(void) {
     char c;
 #ifdef _WIN32
     c = _getch(); // Without Echo Settigns
-    if (ch == 0 || ch == 224) { // function/arrow prefix
-        char ch = _getch();
-        switch (ch) {
+    if (c == 0 || c == 224) { // function/arrow prefix
+        char c = _getch();
+        switch (c) {
         case 72: return KEY_UP;    break;   // 0x48
         case 80: return KEY_DOWN;  break;   // 0x50
         case 75: return KEY_LEFT;  break;   // 0x4B
         case 77: return KEY_RIGHT; break;   // 0x4D
         default:  /* other keys */         break;
         }
-    } else if (ch == 27) {
-        key = KEY_ESC; // plain ESC
+    } else if (c == 27) {
+        return KEY_ESC; // plain ESC
+    } else if (c == '\r') {
+        return '\n';
     }
 #else
     read(STDIN_FILENO, &c, 1);

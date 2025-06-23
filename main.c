@@ -41,6 +41,11 @@ char FLAG = 0;
 char *FileBuffer;
 int FileCursor = 0;
 int IsCommandMode = 0;
+int CUtime;
+int ThreadFlag = 0;
+int Level = 0;
+float Record[10][3];
+int RecordFlag = 0;
 char SampleCode1[] = "asdf\nbrooo";
 char SampleCode2[] = "int convert_bit_range( int c, int from_bits, int to_bits ) {\n    int b = (1 << (from_bits - 1)) + c * ((1 << to_bits) - 1);\n    return (b + (b >> from_bits)) >> from_bits;\n}";
 
@@ -76,6 +81,7 @@ int HandleCommandMode(void) {
     IsCommandMode = 1;
     CICursor = (coor){1, Window.y-2};
     char command[30];
+    for (int i=0;i<30;++i) command[i] = '\0';
     command[0] = ':';
     while (1) {
         char c = Getchar();
@@ -106,6 +112,8 @@ int HandleCommandMode(void) {
         case 8:
         case 127: // Backspace
             --CICursor.x;
+            //TODO DelCharBuf()
+            //TODO RenderRange()
             if (CICursor.x > 0) {
                 WindowBuffer[CICursor.y][CICursor.x] = ' ';
                 RenderFullWindow(WindowBuffer, Window, CICursor);
@@ -142,7 +150,7 @@ int HandleCommandMode(void) {
                 CICursor.x = 0;
                 ++CICursor.y;
             }
-            RenderRange(command, WindowBuffer, Window, (coor){0, Window.y - 2}, (coor){20, Window.y - 2}, CICursor);
+            RenderRange(command, WindowBuffer, Window, (coor){0, Window.y - 1}, (coor){20, Window.y - 1}, CICursor);
             // RenderLine(WindowBuffer[CICursor.y], Window, CICursor);
         }
     }
@@ -151,21 +159,15 @@ int HandleCommandMode(void) {
 void HandleInsertMode(void) {
     while (1) {
         char c = Getchar();
-        int len;
-        if (c == 'q') exit(0);
         switch (c) {
         case 27: // ESC
             RenderRange("              ", WindowBuffer, Window, (coor){0, Window.y - 2}, (coor){20, Window.y - 2}, Cursor);
             return;
         case 8:
         case 127: // Backspace
-            len = strlen(FileBuffer);
-            for (int i=FileCursor-1;i<=len;++i) {
-                FileBuffer[i] = FileBuffer[i+1];
-            }
-            FileBuffer[len] = '\0';
+            DelCharBuf(FileBuffer, FileCursor);
             --FileCursor;
-            if (MoveCursor(KEY_LEFT, &Cursor, (coor){Window.x / 2 - 1, Window.y - 3})) {
+            if (MoveCursor(KEY_LEFT, &Cursor, (coor){Window.x / 2 - 1, Window.y - 3})) { // TODO : Unexpected Behavior
                 MoveCursor(KEY_UP, &Cursor, (coor){Window.x / 2 - 1, Window.y - 3});
                 while (!MoveCursor(KEY_RIGHT, &Cursor, (coor){Window.x / 2 - 1, Window.y - 3})) continue;
                 
@@ -189,7 +191,7 @@ void HandleInsertMode(void) {
                 perror("OutofBound");
                 exit(1);
             }
-            RenderRange(FileBuffer, WindowBuffer, Window, (coor){0, 0}, (coor){Window.x / 2-1, Window.y-3}, Cursor);
+            RenderRange(FileBuffer, WindowBuffer, Window, (coor){0, 0}, (coor){Window.x / 2-1, Window.y-5}, Cursor);
         }
     }
 }
@@ -201,22 +203,22 @@ void HandleNormalMode(void) {
         switch (c) {
         case KEY_UP: // Up Arrow
         case 'k':
-            MoveCursor(1, &Cursor, (coor){Window.x / 2 - 1, Window.y-3});
+            MoveCursor(1, &Cursor, (coor){Window.x / 2 - 1, Window.y-2});
             CursorPos(Cursor);
             break;
         case KEY_DOWN: // Down Arrow
         case 'j':
-            MoveCursor(2, &Cursor, (coor){Window.x / 2 - 1, Window.y-3});
+            MoveCursor(2, &Cursor, (coor){Window.x / 2 - 1, Window.y-2});
             CursorPos(Cursor);
             break;
         case KEY_RIGHT: // Right Arrow
         case 'l':
-            MoveCursor(3, &Cursor, (coor){Window.x / 2 - 1, Window.y-3});
+            MoveCursor(3, &Cursor, (coor){Window.x / 2 - 1, Window.y-2});
             CursorPos(Cursor);
             break;
         case KEY_LEFT: // Left Arrow
         case 'h':
-            MoveCursor(4, &Cursor, (coor){Window.x / 2 - 1, Window.y-3});
+            MoveCursor(4, &Cursor, (coor){Window.x / 2 - 1, Window.y-2});
             CursorPos(Cursor);
             break;
         case 'i':
@@ -235,7 +237,9 @@ void HandleNormalMode(void) {
             RenderFullWindow(WindowBuffer, Window, CICursor);
             int rst = HandleCommandMode();
             if (rst == 1) {
+                ClearWindowBuffer(WindowBuffer, Window);
                 ClearScreen();
+                ThreadFlag = 1;
                 return;
             }
             break;
@@ -244,14 +248,15 @@ void HandleNormalMode(void) {
 }
 
 void RenderTimer(void) {
-    char str[10];
-    for (int i=0;i<10;++i) {
-        sprintf(str, "Time: %02d", i);
+    CUtime = 0;
+    char str[30];
+    while (!ThreadFlag) {
+        sprintf(str, "Time: %02d | %.2f char/s", CUtime, (float)FileCursor / CUtime);
         if (IsCommandMode)
-            RenderRange(str, WindowBuffer, Window, (coor){0, Window.y-1}, (coor){20, Window.y-2}, CICursor);
-        else
-            RenderRange(str, WindowBuffer, Window, (coor){0, Window.y-1}, (coor){20, Window.y-2}, Cursor);
+            RenderRange(str, WindowBuffer, Window, (coor){0, Window.y-1}, (coor){30, Window.y-1}, CICursor);
+        else RenderRange(str, WindowBuffer, Window, (coor){0, Window.y-1}, (coor){30, Window.y-1}, Cursor);
         Wait(1000);
+        ++CUtime;
     }
     return;
 }
@@ -263,36 +268,40 @@ void game(void) {
     Cursor = (coor){0, 0};
     DrawSampleCode();
     Threading(HandleNormalMode, RenderTimer);
-    RenderRange("Congratulations!", WindowBuffer, Window, (coor){0, 0}, (coor){50, 0}, (coor){4, 4});
+    char CongMessage[100];
+    Record[RecordFlag][0] = (float)Level;
+    Record[RecordFlag][1] = (float)CUtime;
+    Record[RecordFlag][2] = (float)FileCursor / CUtime;
+    sprintf(CongMessage, "Congratulations! You wrote in %d seconds!\nPress any key to continue playing...", CUtime);
+    RenderRange(CongMessage, WindowBuffer, Window, (coor){0, 0}, (coor){50, 2}, (coor){4, 4});
+    Getchar();
+    ++RecordFlag;
     return;
 }
 
-int options(void) {
-    RenderRange("Welcome to KeyVim!\n[S] Start Game\n[O] Options\n[T] Tutorial\n[Q] Exit\nSelect an option: ", WindowBuffer, Window, (coor){0, 0}, (coor){19, 7}, (coor){18, 5});
-    char input = Getchar();
-    printf("%c", input);
-    Wait(SHOWTITLE_DELAY);
-    switch(input) {
-    case 'S':
-    case 's':
-        game();
+void options(void) {
+    RenderRange("[1] Level\n[2] Target Time", WindowBuffer, Window, (coor){0, 0}, (coor){20, 7}, (coor){17, 1});
+    char c = Getchar();
+    switch (c) {
+    case '1':
+        RenderRange("Select 1 to 5: ", WindowBuffer, Window, (coor){0, 0}, (coor){20, 7}, (coor){15, 0});
+        char d = Getchar();
+        Level = d - '0';
+        RenderRange("Select 1 to 5: \nSuccessfully set!", WindowBuffer, Window, (coor){0, 0}, (coor){20, 7}, (coor){15, 0});
+        Wait(SHOWTITLE_DELAY * 5);
         break;
-    case 'O':
-    case 'o':
-        return 1;
+    case '2':
+
         break;
-    case 'T':
-    case 't':
-        return 2;
-        break;
-    case 'Q':
-    case 'q':
-        exit(0);
-    default:
-        printf("This option is not available. Please select again.\n");
-        return options();
     }
-    return -1;
+    return;
+}
+
+void leaderboard(void) {
+    char str[140];
+    sprintf(str, "LVL | RECORD | CPM\n%3.0f   %5.0f   %3.0f\n%3.0f   %5.0f   %3.0f\n", Record[0][0], Record[0][1], Record[0][2], Record[1][0], Record[1][1], Record[1][2]);
+    RenderRange(str, WindowBuffer, Window, (coor){0, 0}, (coor){20, 7}, (coor){17, 1});
+    char c = Getchar();
 }
 
 int main(void) {
@@ -308,10 +317,34 @@ int main(void) {
     WindowBuffer = InitWindowBuffer(Window);
     ClearWindowBuffer(WindowBuffer, Window);
     ClearScreen();
-    options();
+    while (1) {
+        RenderRange("Welcome to KeyVim!\n[S] Start Game\n[O] Options\n[L] Leaderboard\n[Q] Exit\nSelect an option: ", WindowBuffer, Window, (coor){0, 0}, (coor){19, 7}, (coor){18, 5});
+        char input = Getchar();
+        printf("%c", input);
+        Wait(SHOWTITLE_DELAY);
+        switch(input) {
+        case 'S':
+        case 's':
+            game();
+            break;
+        case 'O':
+        case 'o':
+            options();
+            break;
+        case 'L':
+        case 'l':
+            leaderboard();
+            break;
+        case 'Q':
+        case 'q':
+            exit(0);
+        default:
+            printf("This option is not available. Please select again.\n");
+            Wait(1000);
+        }
+    }
     return 0;
 }
-
 
 void showtitle(void) {
     ClearScreen();
