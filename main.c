@@ -9,6 +9,15 @@
  *  README!
  *  Do not compile this code as C++. If so, critical potential errors can occur. 
  *
+ * Devnote
+ * TODO TODO TODO
+ *  1. OutofBound error
+ *  2. Tab key
+ *  3. Arrow keys
+ *  4. Slash command (find)
+ *  5. Fully implement insert keys
+ *
+ *
  * * * * * * * * * */
 
 #include <stdio.h>
@@ -28,7 +37,7 @@
 #include "inputhandler.h"
 #include "outputhandler.h"
 
-#define SHOWTITLE_DELAY 100
+#define SHOWTITLE_DELAY 300
 
 void showtitle(void);
 
@@ -37,17 +46,25 @@ coor Window;
 char **WindowBuffer;
 coor Cursor;
 coor CICursor;
-char FLAG = 0;
 char *FileBuffer;
 int FileCursor = 0;
 int IsCommandMode = 0;
-int CUtime;
 int ThreadFlag = 0;
+
+int CUtime;
 int Level = 0;
-float Record[10][3];
-int RecordFlag = 0;
-char SampleCode1[] = "asdf\nbrooo";
-char SampleCode2[] = "int convert_bit_range( int c, int from_bits, int to_bits ) {\n    int b = (1 << (from_bits - 1)) + c * ((1 << to_bits) - 1);\n    return (b + (b >> from_bits)) >> from_bits;\n}";
+int GameCount = 0;
+typedef struct {
+    int level;
+    int time;
+    float cps;
+} Record;
+Record rec[10];
+char SampleCode[5][2000] = {
+    "int convert_bit_range( int c, int from_bits, int to_bits ) {\n    int b = (1 << (from_bits - 1)) + c * ((1 << to_bits) - 1);\n    return (b + (b >> from_bits)) >> from_bits;\n}",
+    "static int libbpf_print_fn(enum libbpf_print_level level, const char *fmt, va_list args) {\nstatic char *lv[] = {\"[wrn] \", \"[inf] \", \"[dbg] \"};\n    FILE *out = level == LIBBPF_WARN ? stderr : stdout;\n    fputs(lv[level], out);\n    return vfprintf(out, fmt, args);\n}",
+    ""
+};
 
 void program_end(void) { // VERIFIED
 #ifndef _WIN32
@@ -62,13 +79,13 @@ void program_end(void) { // VERIFIED
 void DrawSampleCode(void) {
     Cursor.x = 0;
     Cursor.y = 0;
-    RenderRange(SampleCode1, WindowBuffer, Window, (coor){Window.x/2, 0}, (coor){Window.x, Window.y-3}, Cursor);
+    RenderRange(SampleCode[Level], WindowBuffer, Window, (coor){Window.x/2, 0}, (coor){Window.x, Window.y-3}, Cursor);
     return;
 }
 
 int HandleCommand(char *cmd) {
     if (!strcmp(cmd, ":submit")) {
-        if(!strcmp(FileBuffer, SampleCode1)) {
+        if(!strcmp(FileBuffer, SampleCode[Level])) {
             return 1;
         } else return 2;
     }
@@ -146,11 +163,7 @@ int HandleCommandMode(void) {
             // RTR (real time render)
             PutCharBuf(c, command, CICursor.x);
             ++CICursor.x;
-            if (CICursor.x >= Window.x) {
-                CICursor.x = 0;
-                ++CICursor.y;
-            }
-            RenderRange(command, WindowBuffer, Window, (coor){0, Window.y - 1}, (coor){20, Window.y - 1}, CICursor);
+            RenderRange(command, WindowBuffer, Window, (coor){0, Window.y - 2}, (coor){20, Window.y - 2}, CICursor);
             // RenderLine(WindowBuffer[CICursor.y], Window, CICursor);
         }
     }
@@ -266,16 +279,21 @@ void game(void) {
     ClearWindowBuffer(WindowBuffer, Window);
     FileBuffer = InitFileBuffer();
     Cursor = (coor){0, 0};
+    FileCursor = 0;
     DrawSampleCode();
     Threading(HandleNormalMode, RenderTimer);
+    rec[GameCount].level = Level;
+    rec[GameCount].time = CUtime;
+    rec[GameCount].cps = (float)FileCursor / CUtime;
     char CongMessage[100];
-    Record[RecordFlag][0] = (float)Level;
-    Record[RecordFlag][1] = (float)CUtime;
-    Record[RecordFlag][2] = (float)FileCursor / CUtime;
     sprintf(CongMessage, "Congratulations! You wrote in %d seconds!\nPress any key to continue playing...", CUtime);
-    RenderRange(CongMessage, WindowBuffer, Window, (coor){0, 0}, (coor){50, 2}, (coor){4, 4});
+    RenderRange(CongMessage, WindowBuffer, Window, (coor){0, 0}, (coor){50, 2}, (coor){40, 2});
+    CUtime = 0;
+    ThreadFlag = 0;
     Getchar();
-    ++RecordFlag;
+    ++GameCount;
+    ClearScreen();
+    ClearWindowBuffer(WindowBuffer, Window);
     return;
 }
 
@@ -286,7 +304,7 @@ void options(void) {
     case '1':
         RenderRange("Select 1 to 5: ", WindowBuffer, Window, (coor){0, 0}, (coor){20, 7}, (coor){15, 0});
         char d = Getchar();
-        Level = d - '0';
+        Level = d - '0' - 1;
         RenderRange("Select 1 to 5: \nSuccessfully set!", WindowBuffer, Window, (coor){0, 0}, (coor){20, 7}, (coor){15, 0});
         Wait(SHOWTITLE_DELAY * 5);
         break;
@@ -298,15 +316,23 @@ void options(void) {
 }
 
 void leaderboard(void) {
+    ClearScreen();
+    ClearWindowBuffer(WindowBuffer, Window);
     char str[140];
-    sprintf(str, "LVL | RECORD | CPM\n%3.0f   %5.0f   %3.0f\n%3.0f   %5.0f   %3.0f\n", Record[0][0], Record[0][1], Record[0][2], Record[1][0], Record[1][1], Record[1][2]);
-    RenderRange(str, WindowBuffer, Window, (coor){0, 0}, (coor){20, 7}, (coor){17, 1});
+    sprintf(str, "LVL | RECORD |  CPS");
+    RenderRange(str, WindowBuffer, Window, (coor){0, 0}, (coor){20, 0}, (coor){0, 0});
+    for (int i=0;i<GameCount;++i) {
+        char str[140];
+        sprintf(str, "%3d   %6d   %3.2f", rec[i].level, rec[i].time, rec[i].cps);
+        RenderRange(str, WindowBuffer, Window, (coor){0, i + 1}, (coor){50, i + 1}, (coor){0,0});
+    }
     char c = Getchar();
 }
 
 int main(void) {
 #ifndef _WIN32
     original = set_input_mode();
+#else
     system("chcp 65001 > nul");
 #endif
     atexit(program_end);

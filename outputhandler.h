@@ -18,6 +18,7 @@ void KillWindowBuffer(char **Window_buffer, coor w);
 
 void RenderFullWindow(char **WindowBuffer, coor Window, coor Cursor);
 void RenderString(char *str, char **WindowBuffer, coor Window, coor Cursor);
+void RenderLine(const char *line, coor Window, int y, coor Cursor);
 void RenderRange(const char *str, char **WindowBuffer, coor Window, coor TL, coor BR, coor Cursor);
 void PutCharBuf(char c, char *FileBuffer, int FileCursor);
 void DelCharBuf(char *buf, int pos);

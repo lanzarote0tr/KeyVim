@@ -218,7 +218,8 @@ void RenderFullWindow(char **WindowBuffer, coor Window, coor Cursor) {
     return;
 }
 
-void RenderLine(const char *line, coor Window, int y) {
+void RenderLine(const char *line, coor Window, int y, coor Cursor) {
+    HCursor();
     CursorPos((coor){0, y});
     fwrite(line, 1, strnlen(line, Window.x), stdout);
     if (strlen(line) < (size_t)Window.x)
@@ -226,6 +227,9 @@ void RenderLine(const char *line, coor Window, int y) {
             fputc(' ', stdout);
 
     fflush(stdout);
+    CursorPos(Cursor);
+    SCursor();
+    return;
 }
 
 void RenderRange(const char *str, char **WindowBuffer, coor Window, coor TL, coor BR, coor Cursor) {
@@ -264,7 +268,7 @@ void RenderRange(const char *str, char **WindowBuffer, coor Window, coor TL, coo
     if (TL.y != BR.y) {
         RenderFullWindow(WindowBuffer, Window, Cursor);
     } else {
-        RenderLine(WindowBuffer[TL.y], Window, TL.y);
+        RenderLine(WindowBuffer[TL.y], Window, TL.y, Cursor);
     }
     return;
 }

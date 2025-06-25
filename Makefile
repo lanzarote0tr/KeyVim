@@ -25,4 +25,5 @@ outputhandler: outputhandler.c
 # 클린업
 clean:
 	rm -f *.o
+	rm -f a.out
 
